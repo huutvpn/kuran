@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Murottal Qur'an Auto-Scroll</title>
+
+<style>
+body{font-family:sans-serif;margin:0;background:#f1f1f1;}
+.container{padding:15px;max-width:700px;margin:auto;}
+.ayat{direction:rtl;text-align:right;font-size:26px;margin:20px 0;padding:10px;border-radius:6px;}
+.active{background:#c6f7e2;}
+select, button{width:100%;padding:10px;margin-top:10px;font-size:16px;}
+audio{width:100%;margin-top:10px;}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📖 Murottal Qur'an Auto Ayat</h2>
+    <select id="surahSelect"></select>
+    <select id="qariSelect">
+        <option value="ar.alafasy">Al-Afasy</option>
+        <option value="ar.abdulbasitmurattal">Abdul Basit</option>
+        <option value="ar.mahermuaiqly">Maher Al-Muaiqly</option>
+        <option value="ar.saaddghamdi">Saad Al-Ghamdi</option>
+        <option value="ar.husary">Al-Husary</option>
+    </select>
+    <button id="startBtn">Mulai Baca</button>
+    <audio id="player"></audio>
+    <div id="ayatList"></div>
+</div>
+
+<script>
+const surahSelect = document.getElementById("surahSelect");
+const qariSelect = document.getElementById("qariSelect");
+const ayatList = document.getElementById("ayatList");
+const player = document.getElementById("player");
+const startBtn = document.getElementById("startBtn");
+
+let ayatData = [];
+let currentAyah = 0;
+let playing = false;
+
+// Load surah list
+fetch("https://api.alquran.cloud/v1/surah")
+.then(r=>r.json())
+.then(d=>{
+    d.data.forEach(s=>{
+        let opt=document.createElement("option");
+        opt.value=s.number;
+        opt.textContent=`${s.number}. ${s.englishName} (${s.name})`;
+        surahSelect.appendChild(opt);
+    });
+    loadSurah(1);
+});
+
+// Load ayat surah
+function loadSurah(num){
+    fetch(`https://api.alquran.cloud/v1/surah/${num}`)
+    .then(r=>r.json())
+    .then(d=>{
+        ayatData = d.data.ayahs;
+        currentAyah = 0;
+        playing = false;
+        renderAyat();
+    });
+}
+
+// Render ayat
+function renderAyat(){
+    ayatList.innerHTML="";
+    ayatData.forEach((a,i)=>{
+        let div=document.createElement("div");
+        div.className="ayat";
+        div.id="a"+i;
+        div.textContent=a.text;
+        ayatList.appendChild(div);
+    });
+}
+
+function playAyah(i){
+    if(i>=ayatData.length || !playing) return;
+
+    highlight(i);
+
+    let global = ayatData[i].number;
+    let qari = qariSelect.value;
+    let url = `https://cdn.islamic.network/quran/audio/128/${qari}/${global}.mp3`;
+
+    player.src = url;
+    player.play();
+
+    player.onended = ()=>playAyah(i+1);
+}
+
+function highlight(i){
+    document.querySelectorAll(".ayat").forEach(e=>e.classList.remove("active"));
+    let el = document.getElementById("a"+i);
+    el.classList.add("active");
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+startBtn.onclick = ()=>{
+    playing=true;
+    playAyah(0);
+};
+
+surahSelect.onchange = ()=>{
+    player.pause();
+    loadSurah(surahSelect.value);
+};
+
+qariSelect.onchange = ()=>{
+    alert("Qari diganti, silakan tekan Mulai Baca kembali.");
+};
+</script>
+
+</body>
+</html>
