@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Murottal Qur'an + Terjemahan Indonesia</title>
+
+<style>
+body{
+    margin:0;
+    background:#eef2f3;
+    font-family:Verdana,Arial,sans-serif;
+}
+header{
+    background:#0b8d78;
+    color:#fff;
+    padding:15px;
+    font-size:20px;
+    text-align:center;
+    font-weight:bold;
+}
+.container{
+    max-width:760px;
+    margin:auto;
+    padding:15px;
+}
+select,button,audio{
+    width:100%;
+    padding:12px;
+    font-size:16px;
+    margin-top:10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+}
+button{
+    background:#0b8d78;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+button:hover{
+    background:#096c5b;
+}
+.ayatBox{
+    background:white;
+    padding:15px;
+    margin:15px 0;
+    border-radius:10px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.15);
+    transition:.3s;
+}
+.ayatBox.active{
+    background:#c7f8e8;
+}
+.arab{
+    font-size:28px;
+    text-align:right;
+    direction:rtl;
+    margin-bottom:10px;
+    line-height:1.6;
+}
+.indo{
+    font-size:16px;
+    color:#333;
+    line-height:1.4;
+}
+</style>
+</head>
+<body>
+
+<header>📖 Murottal Qur'an + Terjemahan</header>
+
+<div class="container">
+
+    <label>Pilih Surah:</label>
+    <select id="surahSelect"></select>
+
+    <label>Pilih Qari (Murottal):</label>
+    <select id="qariSelect">
+        <option value="ar.alafasy" selected>Al-Afasy</option>
+        <option value="ar.abdulbasitmurattal">Abdul Basit</option>
+        <option value="ar.mahermuaiqly">Maher Al-Muaiqly</option>
+        <option value="ar.saaddghamdi">Saad Al-Ghamdi</option>
+        <option value="ar.husary">Al-Husary</option>
+    </select>
+
+    <button id="startBtn">Mulai Baca</button>
+
+    <audio id="player" controls></audio>
+
+    <div id="ayatList"></div>
+</div>
+
+<script>
+const surahSelect = document.getElementById("surahSelect");
+const qariSelect   = document.getElementById("qariSelect");
+const ayatList     = document.getElementById("ayatList");
+const player       = document.getElementById("player");
+const startBtn     = document.getElementById("startBtn");
+
+let ayatArabic   = [];
+let ayatTranslate = [];
+let currentAyah  = 0;
+let playing      = false;
+let selectedQari = "ar.alafasy";
+
+// Load daftar surah
+fetch("https://api.alquran.cloud/v1/surah")
+.then(r=>r.json())
+.then(d=>{
+    d.data.forEach(s=>{
+        let opt=document.createElement("option");
+        opt.value=s.number;
+        opt.textContent=`${s.number}. ${s.englishName} (${s.name})`;
+        surahSelect.appendChild(opt);
+    });
+    loadSurah(1);
+});
+
+// Load arab + terjemah Indonesia
+function loadSurah(num){
+    ayatArabic = [];
+    ayatTranslate = [];
+    currentAyah = 0;
+    playing = false;
+    player.pause();
+
+    Promise.all([
+        fetch(`https://api.alquran.cloud/v1/surah/${num}/quran-uthmani`).then(r=>r.json()),
+        fetch(`https://api.alquran.cloud/v1/surah/${num}/id.indonesian`).then(r=>r.json())
+    ]).then(([arab,indo])=>{
+        ayatArabic = arab.data.ayahs;
+        ayatTranslate = indo.data.ayahs;
+        renderAyat();
+    });
+}
+
+// Tampilkan arab + terjemah
+function renderAyat(){
+    ayatList.innerHTML="";
+    ayatArabic.forEach((a,i)=>{
+        let box=document.createElement("div");
+        box.className="ayatBox";
+        box.id="ayat-"+i;
+        box.innerHTML=`
+            <div class="arab">${a.text}</div>
+            <div class="indo">${ayatTranslate[i].text}</div>
+        `;
+        ayatList.appendChild(box);
+    });
+}
+
+// Highlight + scroll
+function highlight(i){
+    document.querySelectorAll(".ayatBox").forEach(e=>e.classList.remove("active"));
+    let el=document.getElementById("ayat-"+i);
+    el.classList.add("active");
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+// Putar per ayat
+function playAyah(i){
+    if(i>=ayatArabic.length || !playing) return;
+    currentAyah = i;
+    highlight(i);
+
+    let globalAyah = ayatArabic[i].number;
+    let url = `https://cdn.islamic.network/quran/audio/128/${selectedQari}/${globalAyah}.mp3`;
+
+    player.src = url;
+    player.play();
+
+    player.onended = ()=> playAyah(i+1);
+}
+
+// Event: mulai baca
+startBtn.onclick = ()=>{
+    playing=true;
+    playAyah(0);
+};
+
+// Event: ganti surah
+surahSelect.onchange = ()=>{
+    playing=false;
+    player.pause();
+    loadSurah(surahSelect.value);
+};
+
+// Event: ganti qari (murottal)
+qariSelect.onchange = ()=>{
+    selectedQari = qariSelect.value;
+    let wasPlaying = playing;
+    playing=false;
+    player.pause();
+    if(wasPlaying){
+        playing=true;
+        playAyah(currentAyah);
+    }
+};
+</script>
+
+</body>
+</html>
