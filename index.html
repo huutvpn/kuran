@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qur'an Auto-Scroll</title>
+
+<style>
+body{font-family:sans-serif;margin:0;background:#f5f5f5;}
+.container{padding:15px;max-width:700px;margin:auto;}
+.ayat{direction:rtl;font-size:26px;margin:20px 0;text-align:right;padding:10px;border-radius:6px;transition:.3s;}
+.ayat.active{background:#d1f7e9;}
+#surahSelect{width:100%;padding:10px;font-size:16px;}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+    <h2>📖 Qur'an Auto-Scroll + Audio per Ayat</h2>
+    <select id="surahSelect"></select>
+
+    <div id="ayatList"></div>
+
+    <audio id="player"></audio>
+</div>
+
+<script>
+const surahSelect = document.getElementById("surahSelect");
+const ayatList = document.getElementById("ayatList");
+const player = document.getElementById("player");
+
+let currentSurah = null;
+let currentAyah = 0;
+let ayatData = [];
+
+// Load daftar surah
+fetch("https://api.alquran.cloud/v1/surah")
+.then(r=>r.json())
+.then(d=>{
+    d.data.forEach(s=>{
+        let opt = document.createElement("option");
+        opt.value = s.number;
+        opt.textContent = `${s.number}. ${s.englishName} (${s.name})`;
+        surahSelect.appendChild(opt);
+    });
+    loadSurah(1);
+});
+
+// Load ayat per surah
+function loadSurah(num){
+    currentSurah = num;
+    currentAyah = 0;
+
+    fetch(`https://api.alquran.cloud/v1/surah/${num}/quran-uthmani`)
+    .then(r=>r.json())
+    .then(d=>{
+        ayatData = d.data.ayahs;
+        renderAyat();
+        playAyat(0);
+    });
+}
+
+// Render ayat ke layar
+function renderAyat(){
+    ayatList.innerHTML = "";
+    ayatData.forEach((a,i)=>{
+        let div = document.createElement("div");
+        div.className="ayat";
+        div.id = "ayat-"+i;
+        div.textContent = a.text;
+        ayatList.appendChild(div);
+    });
+}
+
+// Play audio per ayat
+function playAyat(i){
+    if(i>=ayatData.length) return;
+
+    currentAyah = i;
+    highlightAyat(i);
+
+    // hitung nomor ayat global (1–6236)
+    let globalAyah = ayatData[i].number;
+
+    // audio per ayat
+    let audioURL = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${globalAyah}.mp3`;
+
+    player.src = audioURL;
+    player.play();
+
+    player.onended = ()=>{
+        playAyat(i+1);
+    };
+}
+
+// Highlight & Scroll
+function highlightAyat(i){
+    document.querySelectorAll(".ayat").forEach(el=>el.classList.remove("active"));
+    let el = document.getElementById("ayat-"+i);
+    el.classList.add("active");
+    el.scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+// Event pilih surah
+surahSelect.onchange = ()=> loadSurah(surahSelect.value);
+</script>
+
+</body>
+</html>
